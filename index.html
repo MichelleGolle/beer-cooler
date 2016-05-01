@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <title>Beer Cooler</title>
+      <link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.1.1/css/bootstrap.min.css">
+    </head>
+    <body>
+      <div class="container">
+        <h1>FluentStream's Beer Cooler</h1>
+        <div class="page"></div>
+      </div>
+
+      <script src="js/underscore.js"></script>
+      <script src="js/jquery.js"> </script>
+      <script src="js/backbone.js"></script>
+
+      <script type="text/template" id="beer-list-template">
+        <a href="#/new" class="btn btn-primary">Add new beer</a>
+        <hr />
+        <table class="table striped">
+          <thead>
+            <tr>
+              <th>Name</th><th>Likes</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% _.each(beers, function(beer) { %>
+              <tr>
+                <td><%= htmlEncode(beer.get('name')) %></td>
+                <td><%= htmlEncode(beer.get('likes')) %></td>
+                <td><a class="btn" href="#/edit/<%= beer.id %>">Change Likes</a></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </script>
+
+      <script type="text/template" id="edit-beer-template">
+        <form class="edit-beer-form">
+          <legend>Edit Beer</legend>
+            <label>Likes</label>
+            <input name="likes" type="number" value="<%= beer.likes %>">
+            <hr />
+           <button type="submit" class="btn">Update</button>
+           <a href="#/" class="btn">Cancel</a>
+           <input type="hidden" name="id" value="<%= beer.id %>" />
+           <input type="hidden" name="name" value="<%= beer.name %>" />
+        </form>
+      </script>
+
+      <script type="text/template" id="new-beer-template">
+        <form class="new-beer-form">
+          <legend>New Beer</legend>
+            <label>Name</label>
+            <input required=true name="name" type="text">
+            <label>Likes</label>
+            <input name="likes" type="text">
+            <hr />
+           <button type="submit" class="btn">Create</button>
+           <a href="#/" class="btn">Cancel</a>
+        </form>
+      </script>
+
+      <script>
+          function htmlEncode(value){
+            return $('<div/>').text(value).html();
+          }
+          $.fn.serializeObject = function() {
+            var o = {};
+            var a = this.serializeArray();
+            $.each(a, function() {
+                if (o[this.name] !== undefined) {
+                    if (!o[this.name].push) {
+                        o[this.name] = [o[this.name]];
+                    }
+                    o[this.name].push(this.value || '');
+                } else {
+                    o[this.name] = this.value || '';
+                }
+            });
+            return o;
+          };
+          $.ajaxPrefilter( function( options, originalOptions, jqXHR ) {
+            options.url = 'http://beer.fluentcloud.com/v1' + options.url;
+          });
+          var Beers = Backbone.Collection.extend({
+            url: '/beer'
+          });
+
+          var Beer = Backbone.Model.extend({
+            defaults: {
+              likes: 0
+            },
+            urlRoot: '/beer'
+          });
+
+          var BeerListView = Backbone.View.extend({
+            el: '.page',
+            render: function () {
+
+              var that = this;
+              var beers = new Beers();
+              beers.fetch({
+                success: function (beers) {
+                  var template = _.template($('#beer-list-template').html());
+                  var beers = {beers: beers.models};
+                  var html = template(beers);
+                  that.$el.html(html);
+                }
+              })
+            }
+          });
+          var beerListView = new BeerListView();
+
+          var BeerEditView = Backbone.View.extend({
+            el: '.page',
+            events: {
+              'submit .edit-beer-form': 'saveBeer',
+              'submit .new-beer-form': 'saveBeer'
+            },
+            saveBeer: function (ev) {
+              var beerDetails = $(ev.currentTarget).serializeObject();
+              var beer = new Beer();
+              beer.save(beerDetails, {
+                success: function (beer) {
+                  router.navigate('', {trigger:true});
+                }
+              });
+              return false;
+            },
+            render: function (options) {
+              var that = this;
+              if(options.id) {
+                that.beer = new Beer({id: options.id});
+                that.beer.fetch({
+                  success: function (beer) {
+                    var template = _.template($('#edit-beer-template').html());
+                    var beer = {beer: beer};
+                    var html = template(beer);
+                    that.$el.html(html);
+                  }
+                })
+              } else {
+                var template = _.template($('#new-beer-template').html());
+                var beer = {beer: null};
+                var html = template(beer);
+                that.$el.html(html);
+              }
+            }
+          });
+          var beerEditView = new BeerEditView();
+
+          var Router = Backbone.Router.extend({
+              routes: {
+                "": "home",
+                "edit/:id": "edit",
+                "new": "new"
+              }
+          });
+          var router = new Router;
+          router.on('route:home', function() {
+            beerListView.render();
+          })
+          router.on('route:edit', function(id) {
+            beerEditView.render({id: id});
+          })
+          router.on('route:new', function(id) {
+            beerEditView.render({id: id});
+          })
+          Backbone.history.start();
+        </script>
+
+    </body>
+</html>
